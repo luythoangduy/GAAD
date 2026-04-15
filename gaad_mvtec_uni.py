@@ -287,7 +287,7 @@ def train(item_list):
                     metrics = evaluation_image_only(
                         model, test_dl, device,
                         edge_anchors_dict=edge_anchors,
-                        class_list=item_list,
+                        class_name=item_name,
                         top_ratio=0.01,
                     )
                     auroc_list.append(metrics["auroc"])
@@ -325,7 +325,7 @@ def train(item_list):
         metrics = evaluation_image_only(
             model, test_dl, device,
             edge_anchors_dict=edge_anchors,
-            class_list=item_list,
+            class_name=item_name,
             top_ratio=0.01,
         )
         auroc_list.append(metrics["auroc"])

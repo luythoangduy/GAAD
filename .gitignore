@@ -1,0 +1,49 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model weights & checkpoints
+*.pth
+*.pt
+*.ckpt
+*.bin
+saved_results/
+
+# Data
+*.zip
+*.tar.gz
+mvtec_anomaly_detection/
+data/
+
+# Graph visualization output
+graphs/
+
+# Logs
+*.log
+log.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

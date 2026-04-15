@@ -797,52 +797,54 @@ class WarmCosineScheduler(_LRScheduler):
 # ===========================================================================
 
 def evaluation_image_only(model, dataloader, device, edge_anchors_dict,
-                           class_list, top_ratio=0.01):
+                           class_name: str, top_ratio: float = 0.01):
     """
     Evaluate GraphAnomalyAdapter using **image-level metrics only**.
 
+    Each call evaluates ONE class (test dataloader is per-class).
+    Labels from MVTecDataset: 0 = normal, 1 = anomaly (binary).
+
     Args:
         model            : GraphAnomalyAdapter (eval mode)
-        dataloader       : yields (img, gt, label, img_path)
+        dataloader       : per-class loader yielding (img, gt, label, img_path)
         device           : torch device string
-        edge_anchors_dict: nn.ParameterDict or dict {class_name -> Tensor[E, D]}
-        class_list       : list of class names matching label indices
+        edge_anchors_dict: nn.ParameterDict  {safe_class_name -> Tensor[E, D]}
+        class_name       : the class being evaluated (e.g. "carpet")
         top_ratio        : fraction of worst patches used for image score
 
     Returns:
         dict with keys 'auroc', 'ap', 'f1'
     """
     from models.graph_anchors import compute_image_score
-    import torch
 
     model.eval()
     gt_list_sp = []
     pr_list_sp = []
 
-    anchors_on_device = {}
-    for cls_name, anc in edge_anchors_dict.items():
-        safe_key = cls_name.replace("/", "_")
-        anchors_on_device[safe_key] = anc.detach().to(device)
+    safe_key = class_name.replace("/", "_")
+    anchors  = edge_anchors_dict[safe_key].detach().to(device)   # [E, D]
 
     with torch.no_grad():
         for batch in dataloader:
             img, gt, label, *_ = batch
             img = img.to(device)
-            adapter_out = model(img)   # [B, N, D]
-            for b in range(img.shape[0]):
-                cls_idx = label[b].item()
-                cls_name = class_list[cls_idx].replace("/", "_")
-                anchors = anchors_on_device[cls_name]
-                score = compute_image_score(
-                    adapter_out[b].unsqueeze(0),
-                    anchors,
-                    top_ratio=top_ratio,
-                ).item()
-                gt_list_sp.append(int(label[b].item()))
-                pr_list_sp.append(score)
 
-    gt_arr = np.array(gt_list_sp)
-    pr_arr = np.array(pr_list_sp)
+            adapter_out = model(img)   # [B, N, D]
+
+            # Batch-compute scores for all images at once
+            scores = compute_image_score(
+                adapter_out, anchors, top_ratio=top_ratio,
+            )  # [B]
+
+            # label: 0 = normal, 1 = anomaly (correct binary labels)
+            gt_list_sp.extend(label.cpu().tolist())
+            pr_list_sp.extend(scores.cpu().tolist())
+
+    gt_arr = np.array(gt_list_sp, dtype=int)
+    pr_arr = np.array(pr_list_sp, dtype=float)
+
+    if len(np.unique(gt_arr)) < 2:
+        return {"auroc": float("nan"), "ap": float("nan"), "f1": float("nan")}
 
     auroc = roc_auc_score(gt_arr, pr_arr)
     ap    = average_precision_score(gt_arr, pr_arr)
